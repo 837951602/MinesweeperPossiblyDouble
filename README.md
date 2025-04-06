@@ -20,3 +20,4 @@ I tested on IE 6, It works fine except lack of font, resulting `💣` and `🚩`
 
 * Adjust difficulty
 * Beautify (maybe introduce some image)
+* Display idea when flag and mine don't match

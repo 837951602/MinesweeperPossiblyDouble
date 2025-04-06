@@ -1,0 +1,198 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Minesweeper but higher cap</title>
+<style>
+body, .btn { font-size: 15px; white-space: nowrap;}
+.display { width: 3em; border: black 1px solid; display: inline-block; text-align: right; }
+.field { width: 1.5em; height: 1.5em; border: black 1px solid; display: inline-block; background-color: #444444; cursor: default; }
+.revealed { width: 1.5em; height: 1.5em; border: #666666 1px solid; display: inline-block; background-color: #bbbbbb; cursor: default; }
+</style>
+</head>
+<body oncontextmenu="return false" onselectstart="return false" style="text-align: center; height: 100%">
+<input type="button" value="Beginner" class="btn" onclick="Init(9, 9, 10);" />
+<input type="button" value="Intermediate" class="btn" onclick="Init(16, 16, 40);" />
+<input type="button" value="Expert" class="btn" onclick="Init(30, 16, 99);" />
+&nbsp;&nbsp;&nbsp;&nbsp;
+Mines left: <span id="spanMines" class="display">0</span>
+Timer: <span id="spanTimer" class="display">0</span>
+<br />
+<div id="canv"></div>
+<script type="text/javascript">
+// Implemented as global variables, so that
+// to minify, surround by function and
+// most compressors would work fine
+var gameWidth, gameHeight, gameBoard, gameEnded, gameBehave, 
+	gameCount, gameCountG, gameTimer, gameUnrevealedCount;
+var BEHAVE_REVEALED = 64;
+function setCount(n) {
+	gameCount = n;
+	spanMines.innerText = n;
+}
+// No mine nearby n
+function InitBoard(n) {
+	gameUnrevealedCount = gameWidth * gameHeight;
+	gameBoard = Array((gameWidth+1) * (gameHeight+2) + 1);
+	if (gameBoard.fill) gameBoard.fill(0); else {
+		for (var i = gameBoard.length; i--; )
+			gameBoard[i] = 0;
+	}
+	for (var i = gameCountG; i--; ) {
+		var x = 1 + gameWidth * Math.random() | 0;
+		var y = 1 + gameHeight * Math.random() | 0;
+		var x = y * (gameWidth+1) + x;
+		// Nearby detect
+		var y = x - n;
+		if (y < -1) y += 1 + gameWidth;
+		if (y > 1) y -= 1 + gameWidth;
+		if (-2 < y && y < 2 || gameBoard[x] == 2) {
+			++i;
+			continue;
+		}
+		if (!gameBoard[x]) gameUnrevealedCount--;
+		gameBoard[x] ++;
+	}
+	function Second() {
+		gameTimer = setTimeout(Second, 1000);
+		spanTimer.innerText++;
+	}
+	Second();
+}
+function RevealNearby(n) {
+	var nearbyCount = 0;
+	for (var y = -1; y < 2; ++y) {
+		for (var x = -1; x < 2; ++x) {
+			var i = n + y * (1 + gameWidth) + x;
+			if (gameBehave[i] == 0) {
+				Reveal(i);
+			}
+		}
+	}
+}
+function DisplayMines(n) {
+	if (n == 1) {
+		return '💣';
+	} else if (n == 2) {
+		return '​<span style="font-size: 0.5em">💣💣</span>';
+	}
+}
+function DisplayFlags(n) {
+	if (n == 0) {
+		return '​';
+	} else if (n == 1) {
+		return '🚩';
+	} else if (n == 2) {
+		return '​<span style="font-size: 0.5em">🚩🚩</span>';
+	}
+}
+function ShowMines(DispFunc) {
+	if (gameTimer) clearTimeout(gameTimer);
+	gameTimer = 0;
+	gameEnded = true;
+	for (var y = 1; y <= gameHeight; ++y) {
+		for (var x = 1; x <= gameWidth; ++x) {
+			var i = y * (1 + gameWidth) + x;
+			var btn = document.getElementById(i);
+			if (gameBoard[i] && !gameBehave[i]) {
+				btn.innerHTML = DispFunc(gameBoard[i]);
+			} else if (gameBehave[i] && gameBehave[i]<9 && gameBoard[i] != gameBehave[i]) {
+				btn.style.backgroundColor = '#ffff00';
+			}
+		}
+	}
+}
+function Reveal(n) {
+	var btn = document.getElementById(n);
+	if (gameBoard[n]) {
+		btn.style.backgroundColor = '#ff0000';
+		ShowMines(DisplayMines);
+		return;
+	}
+	var nearbyCount = 0;
+	for (var y = -1; y < 2; ++y) {
+		for (var x = -1; x < 2; ++x) {
+			var i = n + y * (1 + gameWidth) + x;
+			nearbyCount += gameBoard[i];
+		}
+	}
+	gameBehave[n] = BEHAVE_REVEALED | nearbyCount;
+	btn.className = 'revealed';
+	btn.innerHTML = nearbyCount ? nearbyCount : '&nbsp;';
+	if (!--gameUnrevealedCount) ShowMines(DisplayFlags);
+	if (!nearbyCount) RevealNearby(n);
+}
+function LClick(n) {
+	if (gameEnded) return;
+	if (!gameBoard) {
+		InitBoard(n);
+	}
+	if (gameBehave[n] == 0) {
+		Reveal(n);
+	} else if (gameBehave[n] & BEHAVE_REVEALED) {
+		var nearbyCount = gameBehave[n];
+		for (var y = -1; y < 2; ++y) {
+			for (var x = -1; x < 2; ++x) {
+				var i = n + y * (1 + gameWidth) + x;
+				if (gameBehave[i] < 9) {
+					nearbyCount -= gameBehave[i];
+				}
+			}
+		}
+		if (nearbyCount == BEHAVE_REVEALED) RevealNearby(n);
+	}
+}
+function RClick(n) {
+	if (gameEnded) return;
+	var btn = document.getElementById(n);
+	switch (gameBehave[n]) {
+	case 0:
+		gameBehave[n] = 1;
+		setCount(gameCount - 1);
+		break;
+	case 1:
+		gameBehave[n] = 2;
+		setCount(gameCount - 1);
+		break;
+	case 2:
+		gameBehave[n] = 0;
+		setCount(gameCount + 2);
+		break;
+	default:
+		return;
+	}
+	btn.innerHTML = DisplayFlags(gameBehave[n]);
+}
+function Init(width, height, count) {
+	if (gameTimer) clearTimeout(gameTimer);
+	gameBehave = Array((width+1) * (height+2) + 1);
+	var i = 0;
+	for (var y = 0; y < height+2; ++y) {
+		for (var x = 0; x < width+1; ++x) {
+			// Borders act as flagged so spread won't go through
+			gameBehave[i++] = y && x && y<=height ? 0 : 9;
+		}
+	}
+	gameBehave[i] = 9;
+	spanTimer.innerText = 0;
+	
+	gameBoard = undefined;
+	gameWidth = width;
+	gameHeight = height;
+	setCount(gameCountG = count);
+	var dispv = [];
+	for (var i=1; i<=height; ++i) {
+		for (var j=1; j<=width; ++j) {
+			var n = i * (width+1) + j;
+			dispv.push('<span class="field" id="' + n + '" onclick="LClick(' +
+				n + ')" oncontextmenu="RClick(' + n + ');">&nbsp;</span>');
+		}
+		dispv.push('<br />');
+	}
+	canv.innerHTML = dispv.join('');
+	gameEnded = false;
+}
+Init(9, 9, 10);
+</script>
+</body>
+</html>
